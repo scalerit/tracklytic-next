@@ -1,6 +1,6 @@
 {
   "name": "tracklytic-next",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Tracklytic client for Next.js applications",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -53,4 +53,4 @@
     "@types/react": "^18.0.0",
     "typescript": "^5.0.0"
   }
-} 
+}
