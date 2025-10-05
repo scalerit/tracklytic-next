@@ -1,0 +1,56 @@
+{
+  "name": "tracklytic-next",
+  "version": "1.0.2",
+  "description": "Tracklytic client for Next.js applications",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "require": "./dist/server.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scalerit/tracklytic-next.git"
+  },
+  "keywords": [
+    "tracklytic",
+    "nextjs",
+    "analytics",
+    "events",
+    "tracking",
+    "insights",
+    "real-time"
+  ],
+  "author": "Tracklytic Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/scalerit/tracklytic-next/issues"
+  },
+  "homepage": "https://github.com/scalerit/tracklytic-next#readme",
+  "peerDependencies": {
+    "next": ">=13.0.0",
+    "react": ">=18.0.0"
+  },
+  "dependencies": {
+    "tracklytic": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "typescript": "^5.0.0"
+  }
+} 
