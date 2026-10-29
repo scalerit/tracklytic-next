@@ -1,164 +1,57 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import Tracklytic from 'tracklytic';
 import type { TracklyticContextValue, TracklyticConfig } from './types';
 
 const TracklyticContext = createContext<TracklyticContextValue | null>(null);
 
-interface TracklyticProviderProps extends TracklyticConfig {
+export interface TracklyticProviderProps extends TracklyticConfig {
   children: React.ReactNode;
 }
 
-export function TracklyticProvider({ 
-  children, 
-  token, 
-  project, 
-  disableTracking = false 
-}: TracklyticProviderProps) {
-  const [client] = useState(() => new Tracklytic({ token, project, disableTracking }));
-  const [userId, setUserIdState] = useState<string | null>(null);
-  const [debug, setDebugState] = useState(false);
+/** Browser usage exposes its configured token to the browser. Prefer the server entry for privileged tokens. */
+export function TracklyticProvider({ children, token, project, disableTracking, baseUrl, accessToken, request }: TracklyticProviderProps) {
+  const client = useMemo(() => new Tracklytic({ token, project, disableTracking, baseUrl, accessToken, request }),
+    [token, project, disableTracking, baseUrl, accessToken, request]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [debug, setDebug] = useState(false);
+  const clearUserId = useCallback(() => setUserId(null), []);
+  const changeDebug = useCallback((flag = true) => setDebug(flag), []);
 
-  const setUserId = useCallback((newUserId: string | null) => {
-    setUserIdState(newUserId);
-    if (debug) {
-      console.log('Tracklytic: User ID set to', newUserId);
-    }
-  }, [debug]);
-
-  const clearUserId = useCallback(() => {
-    setUserIdState(null);
-    if (debug) {
-      console.log('Tracklytic: User ID cleared');
-    }
-  }, [debug]);
-
-  const setDebug = useCallback((flag: boolean = true) => {
-    setDebugState(flag);
-    if (flag) {
-      console.log('Tracklytic: Debug mode enabled');
-    }
-  }, []);
-
-  const track = useCallback(async (options: Parameters<TracklyticContextValue['track']>[0]) => {
+  const track = useCallback<TracklyticContextValue['track']>(async options => {
     try {
-      // Automatically add user_id if not provided and we have one set
-      const trackOptions = userId && !options.user_id 
-        ? { ...options, user_id: userId }
-        : options;
-
-      if (debug) {
-        console.log('Tracklytic: Tracking event', trackOptions);
-      }
-
-      const result = await client.track(trackOptions);
-      
-      if (debug) {
-        console.log('Tracklytic: Event tracked successfully', result);
-      }
-      
-      return result;
+      return await client.track({ ...options, userId: options.userId ?? userId ?? undefined });
     } catch (error) {
-      if (debug) {
-        console.error('Tracklytic: Error tracking event', error);
-      }
+      if (debug) console.error('Tracklytic: Event tracking failed');
       throw error;
     }
   }, [client, userId, debug]);
 
-  const identify = useCallback(async (options: Parameters<TracklyticContextValue['identify']>[0]) => {
-    try {
-      // Automatically add user_id if not provided and we have one set
-      const identifyOptions = userId && !options.user_id 
-        ? { ...options, user_id: userId }
-        : options;
+  const createEvent = useCallback<TracklyticContextValue['createEvent']>(options =>
+    client.createEvent({ ...options, userId: options.userId ?? userId ?? undefined }), [client, userId]);
 
-      if (debug) {
-        console.log('Tracklytic: Identifying user', identifyOptions);
-      }
+  const identify = useCallback<TracklyticContextValue['identify']>(options => {
+    const id = options.userId ?? userId;
+    if (!id) return Promise.reject(new Error('identify requires a userId. Pass it explicitly or call setUserId first.'));
+    return client.identify({ ...options, userId: id });
+  }, [client, userId]);
 
-      const result = await client.identify(identifyOptions);
-      
-      if (debug) {
-        console.log('Tracklytic: User identified successfully', result);
-      }
-      
-      return result;
-    } catch (error) {
-      if (debug) {
-        console.error('Tracklytic: Error identifying user', error);
-      }
-      throw error;
-    }
-  }, [client, userId, debug]);
+  const pipeline = useMemo<TracklyticContextValue['pipeline']>(() => ({
+    ...client.pipeline,
+    create: options => client.pipeline.create({ ...options, userId: options.userId ?? userId ?? undefined }),
+  }), [client, userId]);
 
-  const insight = {
-    track: useCallback(async (options: Parameters<TracklyticContextValue['insight']['track']>[0]) => {
-      try {
-        if (debug) {
-          console.log('Tracklytic: Tracking insight', options);
-        }
+  const value = useMemo<TracklyticContextValue>(() => ({
+    track, createEvent, identify, pipeline, events: client.events, profiles: client.profiles, insight: client.insight,
+    setUserId, clearUserId, setDebug: changeDebug, userId, debug,
+  }), [track, createEvent, identify, pipeline, client, clearUserId, changeDebug, userId, debug]);
 
-        const result = await client.insight.track(options);
-        
-        if (debug) {
-          console.log('Tracklytic: Insight tracked successfully', result);
-        }
-        
-        return result;
-      } catch (error) {
-        if (debug) {
-          console.error('Tracklytic: Error tracking insight', error);
-        }
-        throw error;
-      }
-    }, [client, debug]),
-
-    increment: useCallback(async (options: Parameters<TracklyticContextValue['insight']['increment']>[0]) => {
-      try {
-        if (debug) {
-          console.log('Tracklytic: Incrementing insight', options);
-        }
-
-        const result = await client.insight.increment(options);
-        
-        if (debug) {
-          console.log('Tracklytic: Insight incremented successfully', result);
-        }
-        
-        return result;
-      } catch (error) {
-        if (debug) {
-          console.error('Tracklytic: Error incrementing insight', error);
-        }
-        throw error;
-      }
-    }, [client, debug])
-  };
-
-  const contextValue: TracklyticContextValue = {
-    track,
-    identify,
-    insight,
-    setUserId,
-    clearUserId,
-    setDebug,
-    userId,
-    debug
-  };
-
-  return (
-    <TracklyticContext.Provider value={contextValue}>
-      {children}
-    </TracklyticContext.Provider>
-  );
+  return <TracklyticContext.Provider value={value}>{children}</TracklyticContext.Provider>;
 }
 
 export function useTracklytic(): TracklyticContextValue {
   const context = useContext(TracklyticContext);
-  if (!context) {
-    throw new Error('useTracklytic must be used within a TracklyticProvider');
-  }
+  if (!context) throw new Error('useTracklytic must be used within a TracklyticProvider');
   return context;
-} 
+}

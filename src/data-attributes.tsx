@@ -2,84 +2,56 @@
 
 import { useEffect } from 'react';
 import { useTracklytic } from './context';
-import type { TrackOptions } from './types';
+import type { TrackOptions, LogLevel } from './types';
 
-/**
- * Hook to enable data attribute tracking on elements
- * This allows tracking events directly from HTML elements using data attributes
- */
+const logLevels: LogLevel[] = ['info', 'warning', 'failed', 'critical'];
+
+/** Extract current event fields from a data-event element. Missing notify preserves API defaults. */
+export function eventFromElement(target: Element, userId: string | null = null): TrackOptions | undefined {
+  const event = target.getAttribute('data-event');
+  if (!event) return undefined;
+  const tags: Record<string, string | number | boolean> = {};
+  for (const attribute of Array.from(target.attributes)) {
+    if (!attribute.name.startsWith('data-tag-')) continue;
+    const key = attribute.name.slice('data-tag-'.length);
+    if (!key) continue;
+    const value = attribute.value;
+    const number = Number(value);
+    const parsed = value === 'true' ? true : value === 'false' ? false
+      : value.trim() !== '' && Number.isFinite(number) ? number : value;
+    Object.defineProperty(tags, key, { value: parsed, enumerable: true });
+  }
+  const level = target.getAttribute('data-log-level');
+  const notify = target.getAttribute('data-notify');
+  return {
+    channel: target.getAttribute('data-channel') || 'events', event,
+    userId: target.getAttribute('data-user-id') || userId || undefined,
+    description: target.getAttribute('data-description') || undefined,
+    logLevel: level && logLevels.includes(level as LogLevel) ? level as LogLevel : undefined,
+    notify: notify === 'true' ? true : notify === 'false' ? false : undefined,
+    tags: Object.keys(tags).length ? tags : undefined,
+  };
+}
+
+/** Delegated tracking also handles clicks on children of a data-event element. */
 export function useDataAttributeTracking() {
   const { track, userId } = useTracklytic();
-
   useEffect(() => {
-    const handleClick = async (event: Event) => {
-      const target = event.target as HTMLElement;
-      const eventName = target.getAttribute('data-event');
-      
-      if (!eventName) return;
-
-      // Extract all data attributes
-      const channel = target.getAttribute('data-channel') || 'events';
-      const icon = target.getAttribute('data-icon') || undefined;
-      const description = target.getAttribute('data-description') || undefined;
-      const notify = target.getAttribute('data-notify') === 'true';
-      
-      // Extract user_id (use the one from context if not provided)
-      const elementUserId = target.getAttribute('data-user-id');
-      const finalUserId = elementUserId || userId || undefined;
-
-      // Extract tags (all data-tag-* attributes)
-      const tags: Record<string, string | number | boolean> = {};
-      for (const attr of target.attributes) {
-        if (attr.name.startsWith('data-tag-')) {
-          const tagKey = attr.name.replace('data-tag-', '');
-          const tagValue = attr.value;
-          
-          // Try to parse the value as number or boolean
-          if (tagValue === 'true') {
-            tags[tagKey] = true;
-          } else if (tagValue === 'false') {
-            tags[tagKey] = false;
-          } else if (!isNaN(Number(tagValue))) {
-            tags[tagKey] = Number(tagValue);
-          } else {
-            tags[tagKey] = tagValue;
-          }
-        }
-      }
-
-      const trackOptions: TrackOptions = {
-        channel,
-        event: eventName,
-        user_id: finalUserId,
-        icon,
-        description,
-        notify,
-        tags: Object.keys(tags).length > 0 ? tags : undefined
-      };
-
-      try {
-        await track(trackOptions);
-      } catch (error) {
-        console.error('Failed to track event via data attributes:', error);
-      }
+    const handleClick = (event: Event) => {
+      if (!(event.target instanceof Element)) return;
+      const target = event.target.closest('[data-event]');
+      if (!target) return;
+      const options = eventFromElement(target, userId);
+      if (options) void track(options).catch(() => {
+        console.error('Tracklytic: Data attribute event tracking failed');
+      });
     };
-
-    // Add event listener to document
     document.addEventListener('click', handleClick);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('click', handleClick);
-    };
+    return () => document.removeEventListener('click', handleClick);
   }, [track, userId]);
 }
 
-/**
- * Component that enables data attribute tracking
- * Include this in your app to enable data attribute tracking
- */
 export function TracklyticDataAttributes() {
   useDataAttributeTracking();
   return null;
-} 
+}

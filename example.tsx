@@ -1,141 +1,39 @@
-// Example usage of tracklytic-next
+'use client';
 
-// 1. App Directory Setup (app/layout.tsx)
-import { TracklyticProvider, TracklyticDataAttributes } from 'tracklytic-next';
+// Browser example only. Private API tokens belong in the server integration documented in README.md.
+import { TracklyticProvider, TracklyticDataAttributes, useTracklytic, SetUserId } from './src';
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <TracklyticProvider 
-          token={process.env.NEXT_PUBLIC_TRACKLYTIC_TOKEN!}
-          project={process.env.NEXT_PUBLIC_TRACKLYTIC_PROJECT!}
-          disableTracking={process.env.NODE_ENV === 'development'}
-        >
-          <TracklyticDataAttributes />
-          {children}
-        </TracklyticProvider>
-      </body>
-    </html>
-  );
-}
+function Dashboard() {
+  const { track, identify, insight } = useTracklytic();
 
-// 2. Client Component with Hook Usage
-"use client";
-import { useTracklytic } from 'tracklytic-next';
-
-export function UserDashboard() {
-  const { track, identify, setUserId, insight } = useTracklytic();
-
-  const handleUserLogin = (user: any) => {
-    setUserId(user.id);
-    identify({
-      user_id: user.id,
-      properties: {
-        name: user.name,
-        email: user.email,
-        plan: user.plan,
-      }
-    });
-  };
-
-  const handlePurchase = async () => {
+  async function upgrade() {
+    await identify({ properties: { plan: 'pro' } });
     await track({
-      channel: "ecommerce",
-      event: "Purchase Completed",
-      icon: "🛒",
-      notify: true,
-      tags: {
-        product: "premium_plan",
-        price: "29.99",
-        currency: "USD"
-      }
+      channel: 'billing',
+      event: 'Plan upgraded',
+      logLevel: 'info',
+      badge: { title: 'Pro', color: 'success' },
+      tags: { price: 29.99, currency: 'EUR' },
     });
-  };
-
-  const updateUserCount = async () => {
-    await insight.increment({
-      title: "Active Users",
-      value: 1,
-      icon: "👥"
-    });
-  };
+    await insight.increment({ title: 'Upgrades', value: 1 });
+  }
 
   return (
     <div>
-      <button onClick={handlePurchase}>Buy Premium Plan</button>
-      <button onClick={updateUserCount}>Update User Count</button>
+      <button onClick={upgrade}>Upgrade plan</button>
+      <button data-event="Help opened" data-channel="support" data-log-level="info">
+        <span>Open help</span>
+      </button>
     </div>
   );
 }
 
-// 3. Data Attribute Tracking
-export function UpgradeButton() {
+export default function Example({ browserToken, userId }: { browserToken: string; userId: string }) {
   return (
-    <button
-      data-event="Plan Upgraded"
-      data-channel="billing"
-      data-icon="🚀"
-      data-description="User upgraded to Pro plan"
-      data-notify="true"
-      data-tag-plan="Pro"
-      data-tag-price="29.99"
-      data-tag-period="Monthly"
-    >
-      Upgrade to Pro
-    </button>
-  );
-}
-
-// 4. Server Component for Setting User ID
-import { SetUserIdServerComponent } from 'tracklytic-next';
-
-export function UserProfile({ user }: { user: any }) {
-  return (
-    <div>
-      <h1>Welcome, {user.name}!</h1>
-      <SetUserIdServerComponent userId={user.id} />
-    </div>
-  );
-}
-
-// 5. Server-side Usage (app/api/webhook/route.ts)
-import { TracklyticServer } from 'tracklytic-next/server';
-
-const tracklytic = new TracklyticServer({
-  token: process.env.TRACKLYTIC_TOKEN!,
-  project: process.env.TRACKLYTIC_PROJECT!,
-});
-
-export async function POST(request: Request) {
-  const data = await request.json();
-  
-  await tracklytic.track({
-    channel: "webhooks",
-    event: "Payment Received",
-    user_id: data.userId,
-    icon: "💳",
-    tags: {
-      amount: data.amount,
-      currency: data.currency,
-      provider: data.provider
-    }
-  });
-
-  return Response.json({ success: true });
-}
-
-// 6. Pages Directory Setup (_app.tsx)
-import { TracklyticProvider } from 'tracklytic-next';
-import type { AppProps } from 'next/app';
-
-export default function App({ Component, pageProps }: AppProps) {
-  return (
-    <TracklyticProvider 
-      token={process.env.NEXT_PUBLIC_TRACKLYTIC_TOKEN!}
-      project={process.env.NEXT_PUBLIC_TRACKLYTIC_PROJECT!}
-    >
-      <Component {...pageProps} />
+    <TracklyticProvider token={browserToken} project="my-project">
+      <SetUserId userId={userId} />
+      <TracklyticDataAttributes />
+      <Dashboard />
     </TracklyticProvider>
   );
-} 
+}

@@ -1,424 +1,143 @@
----
-description: Tracklytic client for Next.js applications
----
+# Tracklytic for Next.js
 
-# Next.js
+TypeScript integration for events, profiles, insights and pipelines. The SDK uses the current Tracklytic `/v1` API through the `tracklytic` client. Events use `logLevel` and optional `badge`; event icons and emoji fields are no longer supported.
 
-### Installation <a href="#installation" id="installation"></a>
+This source update targets JavaScript SDK 2.0.0. Its source release is tagged in GitLab; npm publication is still pending. The production dependency currently retains the published JavaScript SDK version, so a regular registry install cannot build the new API yet. Use the local verification command below. Before publishing this package, release `tracklytic@2.0.0` to npm, update the dependency and lockfile, and verify a fresh install. No Next.js package release has been performed.
 
-#### Using npm <a href="#using-npm" id="using-npm"></a>
+## Server integration (recommended)
 
-```bash
-npm install tracklytic-next
+Keep the API token in a server environment variable. Import the separate server entry in Route Handlers, Server Actions or Server Components:
+
+```typescript
+import { TracklyticServer } from 'tracklytic-next/server';
+
+const tracklytic = new TracklyticServer({
+  token: process.env.TRACKLYTIC_TOKEN!,
+  project: 'my-project',
+});
+
+await tracklytic.track({
+  channel: 'payments',
+  event: 'Payment received',
+  userId: 'user-123',
+  logLevel: 'info',
+  badge: { title: 'Paid', color: 'success' },
+  tags: { amount: 29.99, currency: 'EUR' },
+  timestamp: Date.now(),
+});
 ```
 
-#### Using yarn <a href="#using-yarn" id="using-yarn"></a>
+`track()` retains its boolean success result. Use `createEvent()` to receive the response body, especially the generated ID when sending a pipeline. Normal events return `{}`; pipeline creation returns its ID, derived status and pipeline state.
 
-```bash
-yarn add tracklytic-next
-```
+## Pipelines
 
-#### Using pnpm <a href="#using-pnpm" id="using-pnpm"></a>
+```typescript
+const pipeline = await tracklytic.pipeline.create({
+  channel: 'deployments',
+  event: 'Production deployment',
+  steps: [
+    { id: 'build', name: 'Build', stage: 'Build' },
+    { id: 'deploy', name: 'Deploy', stage: 'Deploy', requires: ['build'] },
+  ],
+  pipeline: { timeout: 1800, timeoutAlert: { logLevel: 'failed', notify: true } },
+});
 
-```bash
-pnpm add tracklytic-next
-```
-
-### Usage <a href="#usage" id="usage"></a>
-
-The usage depends on whether you are using the app directory structure or the pages directory structure.
-
-**App Directory:**
-
-In the app directory, you need to wrap your app with the TracklyticProvider in your root layout component:
-
-```tsx
-import { TracklyticProvider } from 'tracklytic-next';
-
-export default function RootLayout({
-  children
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en">
-      <body>
-        <TracklyticProvider 
-          token='<TOKEN_NAME>' 
-          project='<PROJECT_NAME>'
-          disableTracking={process.env.NODE_ENV === 'development'}
-        >
-          {/* Your layout */}
-          <main>{children}</main>
-        </TracklyticProvider>
-      </body>
-    </html>
-  );
+// Disabled tracking returns undefined and makes no request.
+if (pipeline) {
+  await tracklytic.pipeline.update(pipeline.id, { id: 'build', status: 'running' });
+  await tracklytic.pipeline.update(pipeline.id, { id: 'build', status: 'success' });
+  await tracklytic.pipeline.update(pipeline.id, { id: 'deploy', status: 'running' });
+  await tracklytic.pipeline.update(pipeline.id, { id: 'deploy', status: 'success' });
 }
 ```
 
-For setting the user id in server components, use the `SetUserIdServerComponent`:
+A stage groups steps visually. Dependencies use `requires`. Tracklytic records the state; your CI or worker performs the actual work. Step statuses: `waiting`, `running`, `success`, `failed`, `skipped`, `cancelled`.
 
-```tsx
-import { SetUserIdServerComponent } from 'tracklytic-next';
+The server client inherits the full JavaScript SDK API, including `events`, `profiles`, `insight`, `pipeline.updateAsUser()` and `pipeline.executeAction()`. Reading and managing existing data and executing actions require a separate user access JWT:
 
-export default function Page() {
-  const userId: string | null = 'user-123';
-  
-  return (
-    <>
-      {/* Your page content */}
-      <SetUserIdServerComponent userId={userId} />
-    </>
-  );
-}
+```typescript
+const userClient = new TracklyticServer({
+  token: process.env.TRACKLYTIC_TOKEN!,
+  project: 'my-project',
+  accessToken: userAccessToken,
+});
 ```
 
-**Pages Directory:**
+Create a client per authenticated request when using a user's access token. Never store different users' tokens in one shared instance. `baseUrl` supports another API host; `request` supports a custom fetch implementation. HTTP failures reject the promise; errors are not silently converted to success.
 
-In the pages directory, you can wrap your app with the TracklyticProvider, similar to how you would do in a React application:
+## Client provider and hook
+
+The browser provider exposes its configured credentials to the browser. Use it only when that exposure is intentional. For private tokens, call your own authenticated server endpoint instead. Do not pass a private API token or user access token from the layout into this provider.
 
 ```tsx
+// app/providers.tsx
+'use client';
+
 import { TracklyticProvider } from 'tracklytic-next';
 
-export default function App({ Component, pageProps }: AppProps) {
+export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <TracklyticProvider 
-      token='<TOKEN_NAME>' 
-      project='<PROJECT_NAME>'
-      disableTracking={process.env.NODE_ENV === 'development'}
-    >
-      {/* Your app content */}
-      <Component {...pageProps} />
+    <TracklyticProvider token="intentionally-browser-visible-token" project="my-project">
+      {children}
     </TracklyticProvider>
   );
 }
 ```
 
-### Hooks <a href="#hooks" id="hooks"></a>
-
-The `useTracklytic` hook can be used across your client components and provides the following methods:
-
-* `track(options: TrackOptions)`: Track custom events.
-* `identify(options: IdentifyOptions)`: Identify user traits.
-* `setUserId(userId: string | null)`: Set the user id for the current user. If the user is not logged in, pass null.
-* `clearUserId()`: Clear the user id for the current user.
-* `setDebug(flag: boolean = true)`: Set debug mode for logging.
-* `insight.track(options: InsightTrackOptions)`: Track insights.
-* `insight.increment(options: InsightIncrementOptions)`: Increment insight values.
-
-**Usage:**
+Wrap `children` in the provider in the App Router layout or Pages Router `_app`. `TracklyticProviderApp` is an alias for the same provider.
 
 ```tsx
-"use client";
-import { useTracklytic } from 'tracklytic-next';
+'use client';
 
-export function Component() {
-  // Get the hooks
-  const { setUserId, track, identify, insight } = useTracklytic();
-
-  // Set the user id when user logs in
-  setUserId('user-123');
-
-  // Track an event
-  track({
-    channel: "payments",
-    event: "New Subscription",
-    user_id: "user-123", // optional when set using setUserId
-    icon: "💰",
-    notify: true,
-    tags: {
-      plan: "premium",
-      cycle: "monthly",
-      trial: false
-    }
-  });
-
-  // Identify user traits (e.g., name, email, plan, etc.)
-  identify({
-    user_id: "user-123", // optional when set using setUserId
-    properties: {
-      name: "John Doe",
-      email: "john@doe.com",
-      plan: "premium",
-    }
-  });
-
-  // Track an insight
-  insight.track({
-    title: "User Count",
-    value: "100",
-    icon: "👨",
-  });
-
-  // Increment an insight value
-  insight.increment({
-    title: "User Count",
-    value: 1,
-    icon: "👨",
-  });
-
-  // Rest of your component
-}
-```
-
-These hooks have the same usage as their counterparts in the base Tracklytic package.
-
-### Tracking Events <a href="#tracking-events" id="tracking-events"></a>
-
-You can also track events directly from HTML elements using data attributes. First, include the `TracklyticDataAttributes` component in your app:
-
-```tsx
-import { TracklyticDataAttributes } from 'tracklytic-next';
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <TracklyticProvider token='<TOKEN>' project='<PROJECT>'>
-          <TracklyticDataAttributes />
-          {children}
-        </TracklyticProvider>
-      </body>
-    </html>
-  );
-}
-```
-
-Then you can use data attributes on any element:
-
-```jsx
-<button
-  data-event="Upgraded Plan"
-  data-user-id="user-123"     // optional (optional when set using setUserId)
-  data-channel="billing"      // optional (defaults to "events")
-  data-icon=":moneybag:"      // optional
-  data-description="User upgraded to Pro plan" // optional
-  data-notify="true"          // optional
-  data-tag-plan="Pro"         // optional
-  data-tag-period="Monthly"   // optional
-  data-tag-price="9.99"       // optional
->
-  Upgrade to Pro
-</button>
-```
-
-In this example, when the button is clicked, an event named "Upgraded Plan" will be tracked with the specified tags.
-
-### Server-side Usage with Next.js <a href="#server-side-usage-with-next" id="server-side-usage-with-next"></a>
-
-For server-side usage, you can use Tracklytic from `tracklytic-next/server`. It behaves similarly to the base Tracklytic client.
-
-```typescript
-import { TracklyticServer } from 'tracklytic-next/server';
-
-// Initialize TracklyticServer
-const tracklytic = new TracklyticServer({
-  token: '<TOKEN>',
-  project: '<PROJECT_NAME>',
-});
-
-// Use it in your server-side code
-// Track an event
-await tracklytic.track({
-  channel: "payments",
-  event: "New Subscription",
-  user_id: "user-123",
-  icon: "💰",
-  notify: true,
-  tags: {
-    plan: "premium",
-    cycle: "monthly",
-    trial: false
-  }
-});
-
-// Identify a user
-await tracklytic.identify({
-  user_id: "user-123",
-  properties: {
-    name: "John Doe",
-    email: "john@doe.com",
-    plan: "premium",
-  }
-});
-
-// Track an insight
-await tracklytic.insight.track({
-  title: "User Count",
-  value: "100",
-  icon: "👨",
-});
-
-// Increment an insight value
-await tracklytic.insight.increment({
-  title: "User Count",
-  value: 1,
-  icon: "👨",
-});
-```
-
-### API Reference <a href="#api-reference" id="api-reference"></a>
-
-#### TracklyticProvider
-
-The main provider component that wraps your app.
-
-**Props:**
-- `token: string` - Your Tracklytic API token
-- `project: string` - Your Tracklytic project name
-- `disableTracking?: boolean` - Disable tracking (useful for development)
-- `children: React.ReactNode` - Your app content
-
-#### useTracklytic
-
-A React hook that provides access to Tracklytic functionality.
-
-**Returns:**
-- `track(options: TrackOptions) => Promise<boolean>` - Track an event
-- `identify(options: IdentifyOptions) => Promise<boolean>` - Identify a user
-- `setUserId(userId: string | null) => void` - Set the current user ID
-- `clearUserId() => void` - Clear the current user ID
-- `setDebug(flag?: boolean) => void` - Enable/disable debug mode
-- `insight.track(options: InsightTrackOptions) => Promise<boolean>` - Track an insight
-- `insight.increment(options: InsightIncrementOptions) => Promise<boolean>` - Increment an insight
-- `userId: string | null` - Current user ID
-- `debug: boolean` - Debug mode status
-
-#### TracklyticServer
-
-Server-side client for use in server components and API routes.
-
-**Methods:**
-- `track(options: TrackOptions) => Promise<boolean>` - Track an event
-- `identify(options: IdentifyOptions) => Promise<boolean>` - Identify a user
-- `insight.track(options: InsightTrackOptions) => Promise<boolean>` - Track an insight
-- `insight.increment(options: InsightIncrementOptions) => Promise<boolean>` - Increment an insight
-
-#### Data Attributes
-
-The following data attributes are supported for automatic event tracking:
-
-- `data-event` - Event name (required)
-- `data-channel` - Channel name (optional, defaults to "events")
-- `data-user-id` - User ID (optional)
-- `data-icon` - Event icon (optional)
-- `data-description` - Event description (optional)
-- `data-notify` - Send notification (optional, "true" or "false")
-- `data-tag-*` - Event tags (optional, any number of tags)
-
-### Examples <a href="#examples" id="examples"></a>
-
-#### Basic Setup
-
-```tsx
-// app/layout.tsx
-import { TracklyticProvider } from 'tracklytic-next';
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <TracklyticProvider 
-          token={process.env.NEXT_PUBLIC_TRACKLYTIC_TOKEN!}
-          project={process.env.NEXT_PUBLIC_TRACKLYTIC_PROJECT!}
-        >
-          {children}
-        </TracklyticProvider>
-      </body>
-    </html>
-  );
-}
-```
-
-#### User Authentication
-
-```tsx
-// components/UserProvider.tsx
-"use client";
-import { useTracklytic } from 'tracklytic-next';
-import { useEffect } from 'react';
-
-export function UserProvider({ user }: { user: any }) {
-  const { setUserId, identify } = useTracklytic();
-
-  useEffect(() => {
-    if (user) {
-      setUserId(user.id);
-      identify({
-        user_id: user.id,
-        properties: {
-          name: user.name,
-          email: user.email,
-          plan: user.plan,
-        }
-      });
-    } else {
-      setUserId(null);
-    }
-  }, [user, setUserId, identify]);
-
-  return null;
-}
-```
-
-#### Event Tracking
-
-```tsx
-// components/UpgradeButton.tsx
-"use client";
 import { useTracklytic } from 'tracklytic-next';
 
 export function UpgradeButton() {
-  const { track } = useTracklytic();
+  const { track, identify, setUserId, pipeline, insight } = useTracklytic();
 
-  const handleUpgrade = async () => {
-    await track({
-      channel: "billing",
-      event: "Plan Upgraded",
-      icon: "🚀",
-      notify: true,
-      tags: {
-        plan: "pro",
-        price: "29.99"
-      }
-    });
-  };
+  async function upgrade() {
+    setUserId('user-123');
+    // Pass explicitly when tracking immediately after setUserId: state updates on the next render.
+    await identify({ userId: 'user-123', properties: { plan: 'pro' } });
+    await track({ channel: 'billing', event: 'Plan upgraded', userId: 'user-123', logLevel: 'info' });
+    await insight.increment({ title: 'Upgrades', value: 1 });
+  }
 
-  return (
-    <button onClick={handleUpgrade}>
-      Upgrade to Pro
-    </button>
-  );
+  return <button onClick={upgrade}>Upgrade</button>;
 }
 ```
 
-#### Server-side Tracking
+The hook exposes `track`, `createEvent`, `identify`, `pipeline`, `events`, `profiles`, `insight`, `userId`, `setUserId`, `clearUserId`, `debug` and `setDebug`. The current `userId` is added to events, pipeline creation and identify calls when omitted. An identify call without an explicit or contextual ID rejects before sending. Changing provider configuration recreates the base client.
+
+`SetUserId` is a Client Component that synchronizes an ID supplied by a Server Component with the surrounding provider. The older name `SetUserIdServerComponent` remains as a deprecated alias.
+
+## Data attributes
+
+Mount `<TracklyticDataAttributes />` once inside the provider. Clicks on nested child elements also resolve to the nearest `data-event` element.
 
 ```tsx
-// app/api/webhook/route.ts
-import { TracklyticServer } from 'tracklytic-next/server';
+<button
+  data-event="Plan upgraded"
+  data-channel="billing"
+  data-log-level="info"
+  data-tag-plan="pro"
+  data-tag-price="29.99"
+>
+  <span>Upgrade</span>
+</button>
+```
 
-const tracklytic = new TracklyticServer({
-  token: process.env.TRACKLYTIC_TOKEN!,
-  project: process.env.TRACKLYTIC_PROJECT!,
-});
+Supported attributes: `data-event`, `data-channel`, `data-user-id`, `data-description`, `data-log-level`, `data-notify` and `data-tag-*`. `data-icon` has been removed. Omitting `data-notify` preserves the API's notification default; explicit `true` and `false` override it. Tag values parse finite numbers and booleans; other values remain strings.
 
-export async function POST(request: Request) {
-  const data = await request.json();
-  
-  // Track the webhook event
-  await tracklytic.track({
-    channel: "webhooks",
-    event: "Payment Received",
-    user_id: data.userId,
-    icon: "💳",
-    tags: {
-      amount: data.amount,
-      currency: data.currency
-    }
-  });
+## Source and mirrors
 
-  return Response.json({ success: true });
-}
-``` 
+GitLab remains the source repository. [GitHub](https://github.com/scalerit/tracklytic-next) is a push mirror; make changes through the GitLab repository.
+
+## Local verification
+
+To verify both unreleased SDKs together from a clean dependency install:
+
+```sh
+npm run test:local-sdk
+```
+
+The script installs dependencies in the sibling SDK, builds and packs it into a temporary directory, installs this package from the lockfile, verifies it with the packed SDK, and finally restores registry dependencies. It changes neither package manifests nor lockfiles. Regular `npm run build` / `npm test` against the currently published SDK cannot validate the new APIs and will fail until the compatible JavaScript SDK is released and the dependency has been updated. Publishing must wait for that coordinated release.

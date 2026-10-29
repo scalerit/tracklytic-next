@@ -1,23 +1,21 @@
-import type { TrackOptions, IdentifyOptions, InsightTrackOptions, InsightIncrementOptions } from 'tracklytic';
+import type Tracklytic from 'tracklytic';
+import type { ClientOptions, IdentifyOptions } from 'tracklytic';
 
-export type { TrackOptions, IdentifyOptions, InsightTrackOptions, InsightIncrementOptions };
-
-export interface TracklyticConfig {
-  token: string;
-  project: string;
-  disableTracking?: boolean;
-}
+export type * from 'tracklytic';
+export type TracklyticConfig = ClientOptions;
+export type ContextIdentifyOptions = Omit<IdentifyOptions, 'userId'> & { userId?: string };
 
 export interface TracklyticContextValue {
-  track: (options: TrackOptions) => Promise<boolean>;
-  identify: (options: IdentifyOptions) => Promise<boolean>;
-  insight: {
-    track: (options: InsightTrackOptions) => Promise<boolean>;
-    increment: (options: InsightIncrementOptions) => Promise<boolean>;
-  };
+  track: Tracklytic['track'];
+  createEvent: Tracklytic['createEvent'];
+  identify: (options: ContextIdentifyOptions) => ReturnType<Tracklytic['identify']>;
+  pipeline: Tracklytic['pipeline'];
+  events: Tracklytic['events'];
+  profiles: Tracklytic['profiles'];
+  insight: Tracklytic['insight'];
   setUserId: (userId: string | null) => void;
   clearUserId: () => void;
   setDebug: (flag?: boolean) => void;
   userId: string | null;
   debug: boolean;
-} 
+}
