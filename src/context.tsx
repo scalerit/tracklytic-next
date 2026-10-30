@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
-import Tracklytic from 'tracklytic';
+import Tracklytic from '@scalerit/tracklytic';
 import type { TracklyticContextValue, TracklyticConfig } from './types';
 
 const TracklyticContext = createContext<TracklyticContextValue | null>(null);

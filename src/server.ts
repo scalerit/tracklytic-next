@@ -1,4 +1,4 @@
-import Tracklytic from 'tracklytic';
+import Tracklytic from '@scalerit/tracklytic';
 import type { TracklyticConfig } from './types';
 
 /** Server-only entry point for Route Handlers, Server Actions and Server Components. */
@@ -9,4 +9,4 @@ export function createTracklyticServer(config: TracklyticConfig): TracklyticServ
 }
 
 export type * from './types';
-export { HTTPResponseError } from 'tracklytic';
+export { HTTPResponseError } from '@scalerit/tracklytic';

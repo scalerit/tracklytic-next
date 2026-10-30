@@ -1,7 +1,7 @@
-import type Tracklytic from 'tracklytic';
-import type { ClientOptions, IdentifyOptions } from 'tracklytic';
+import type Tracklytic from '@scalerit/tracklytic';
+import type { ClientOptions, IdentifyOptions } from '@scalerit/tracklytic';
 
-export type * from 'tracklytic';
+export type * from '@scalerit/tracklytic';
 export type TracklyticConfig = ClientOptions;
 export type ContextIdentifyOptions = Omit<IdentifyOptions, 'userId'> & { userId?: string };
 

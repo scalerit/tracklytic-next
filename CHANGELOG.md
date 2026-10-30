@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.1 — 2026-10-30
+
+### Changed
+
+- Move the package into the ScalerIT npm organization as `@scalerit/tracklytic-next`.
+- Use the scoped JavaScript client `@scalerit/tracklytic`; update imports to `@scalerit/tracklytic-next` and `@scalerit/tracklytic-next/server`.
+- Retain the existing unscoped 2.0.0 source tag and release artifact unchanged.
+
 ## 2.0.0 — 2026-10-30
 
 ### Changed

@@ -2,15 +2,23 @@
 
 TypeScript integration for events, profiles, insights and pipelines. The SDK uses the current Tracklytic `/v1` API through the `tracklytic` client. Events use `logLevel` and optional `badge`; event icons and emoji fields are no longer supported.
 
-This source uses the official JavaScript SDK 2.0.0 [GitHub release package](https://github.com/scalerit/tracklytic-js/releases/tag/v2.0.0). The dependency is pinned to its public release tarball, and the lockfile verifies its integrity. Installation requires no GitLab credentials. The npm registry publication of `tracklytic@2.0.0` is still pending; once available, replace the release URL with the matching registry version and regenerate the lockfile. The Next.js 2.0.0 release package is available from GitHub. Its npm registry publication is pending.
+The npm package is named `@scalerit/tracklytic-next` and uses `@scalerit/tracklytic`. Version 2.0.1 moves both SDKs into the ScalerIT npm organization. The earlier 2.0.0 GitHub release remains available under its original unscoped package name and has not been changed. The dependency uses the official public scoped JavaScript 2.0.1 release tarball with lockfile integrity verification, so a normal checkout needs no sibling SDK or GitLab credentials. The scoped npm publication is being prepared; do not infer npm availability from a source tag or GitHub release.
 
+
+## Package name
+
+Use imports from `@scalerit/tracklytic-next` and `@scalerit/tracklytic-next/server`. When the scoped release is published to npm:
+
+```sh
+npm install @scalerit/tracklytic-next
+```
 
 ## Server integration (recommended)
 
 Keep the API token in a server environment variable. Import the separate server entry in Route Handlers, Server Actions or Server Components:
 
 ```typescript
-import { TracklyticServer } from 'tracklytic-next/server';
+import { TracklyticServer } from '@scalerit/tracklytic-next/server';
 
 const tracklytic = new TracklyticServer({
   token: process.env.TRACKLYTIC_TOKEN!,
@@ -74,7 +82,7 @@ The browser provider exposes its configured credentials to the browser. Use it o
 // app/providers.tsx
 'use client';
 
-import { TracklyticProvider } from 'tracklytic-next';
+import { TracklyticProvider } from '@scalerit/tracklytic-next';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -90,7 +98,7 @@ Wrap `children` in the provider in the App Router layout or Pages Router `_app`.
 ```tsx
 'use client';
 
-import { useTracklytic } from 'tracklytic-next';
+import { useTracklytic } from '@scalerit/tracklytic-next';
 
 export function UpgradeButton() {
   const { track, identify, setUserId, pipeline, insight } = useTracklytic();
