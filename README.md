@@ -2,7 +2,8 @@
 
 TypeScript integration for events, profiles, insights and pipelines. The SDK uses the current Tracklytic `/v1` API through the `tracklytic` client. Events use `logLevel` and optional `badge`; event icons and emoji fields are no longer supported.
 
-This source update targets JavaScript SDK 2.0.0. Its source release is tagged in GitLab; npm publication is still pending. The production dependency currently retains the published JavaScript SDK version, so a regular registry install cannot build the new API yet. Use the local verification command below. Before publishing this package, release `tracklytic@2.0.0` to npm, update the dependency and lockfile, and verify a fresh install. No Next.js package release has been performed.
+This source uses the official JavaScript SDK 2.0.0 [GitHub release package](https://github.com/scalerit/tracklytic-js/releases/tag/v2.0.0). The dependency is pinned to its public release tarball, and the lockfile verifies its integrity. Installation requires no GitLab credentials. The npm registry publication of `tracklytic@2.0.0` is still pending; once available, replace the release URL with the matching registry version and regenerate the lockfile. No Next.js package release has been performed.
+
 
 ## Server integration (recommended)
 
@@ -132,12 +133,21 @@ Supported attributes: `data-event`, `data-channel`, `data-user-id`, `data-descri
 
 GitLab remains the source repository. [GitHub](https://github.com/scalerit/tracklytic-next) is a push mirror; make changes through the GitLab repository.
 
-## Local verification
+## Verification
 
-To verify both unreleased SDKs together from a clean dependency install:
+A normal install verifies the SDK against the official public release package:
+
+```sh
+npm ci
+npm test
+```
+
+`npm test` builds the SDK and runs its HTTP-contract and React-provider tests. The JavaScript release tarball contains compiled code, so no sibling checkout or local override is needed.
+
+To test unreleased changes from a sibling `tl_js` checkout instead:
 
 ```sh
 npm run test:local-sdk
 ```
 
-The script installs dependencies in the sibling SDK, builds and packs it into a temporary directory, installs this package from the lockfile, verifies it with the packed SDK, and finally restores registry dependencies. It changes neither package manifests nor lockfiles. Regular `npm run build` / `npm test` against the currently published SDK cannot validate the new APIs and will fail until the compatible JavaScript SDK is released and the dependency has been updated. Publishing must wait for that coordinated release.
+This optional script builds and packs the sibling SDK into a temporary directory, installs this package from the lockfile, verifies it with that temporary package, and restores the declared public release dependency afterward. It changes neither package manifests nor lockfiles.

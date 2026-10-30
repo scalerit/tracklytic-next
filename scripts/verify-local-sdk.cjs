@@ -1,4 +1,4 @@
-// Verify against a fresh build/pack of the unreleased sibling SDK, then restore registry dependencies.
+// Verify against a fresh build/pack of the unreleased sibling SDK, then restore the declared release dependency.
 const { spawnSync } = require('node:child_process');
 const { mkdtempSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
@@ -26,9 +26,9 @@ try {
 } finally {
   try {
     npm(['ci', '--ignore-scripts', '--no-audit', '--no-fund']);
-    console.log('Restored registry dependencies. The local API update still requires a coordinated SDK release.');
+    console.log('Restored the declared public release dependency.');
   } catch (error) {
-    console.error(`Could not restore registry dependencies: ${error.message}`);
+    console.error(`Could not restore declared release dependencies: ${error.message}`);
     status = 1;
   }
   rmSync(temporary, { recursive: true, force: true });

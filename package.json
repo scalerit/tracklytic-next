@@ -48,7 +48,7 @@
     "react": ">=18.0.0"
   },
   "dependencies": {
-    "tracklytic": "^1.0.0"
+    "tracklytic": "https://github.com/scalerit/tracklytic-js/releases/download/v2.0.0/tracklytic-2.0.0.tgz"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
