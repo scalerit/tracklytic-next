@@ -2,7 +2,7 @@
 
 TypeScript integration for events, profiles, insights and pipelines. The SDK uses the current Tracklytic `/v1` API through the `tracklytic` client. Events use `logLevel` and optional `badge`; event icons and emoji fields are no longer supported.
 
-This source uses the official JavaScript SDK 2.0.0 [GitHub release package](https://github.com/scalerit/tracklytic-js/releases/tag/v2.0.0). The dependency is pinned to its public release tarball, and the lockfile verifies its integrity. Installation requires no GitLab credentials. The npm registry publication of `tracklytic@2.0.0` is still pending; once available, replace the release URL with the matching registry version and regenerate the lockfile. No Next.js package release has been performed.
+This source uses the official JavaScript SDK 2.0.0 [GitHub release package](https://github.com/scalerit/tracklytic-js/releases/tag/v2.0.0). The dependency is pinned to its public release tarball, and the lockfile verifies its integrity. Installation requires no GitLab credentials. The npm registry publication of `tracklytic@2.0.0` is still pending; once available, replace the release URL with the matching registry version and regenerate the lockfile. The Next.js 2.0.0 release package is available from GitHub. Its npm registry publication is pending.
 
 
 ## Server integration (recommended)
